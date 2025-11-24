@@ -189,36 +189,51 @@ export namespace ProviderTransform {
     return options
   }
 
-  export function providerOptions(npm: string | undefined, providerID: string, options: { [x: string]: any }) {
+  export function providerOptions(
+    npm: string | undefined,
+    providerID: string,
+    options: { [x: string]: any },
+    extra?: { hasDeferredTools?: boolean },
+  ) {
+    const baseOptions = { ...options }
+
+    // Add tool search tool for Anthropic when there are deferred tools
+    if ((npm === "@ai-sdk/anthropic" || providerID === "anthropic") && extra?.hasDeferredTools) {
+      baseOptions["toolSearchTool"] = {
+        type: "tool_search_tool_regex_20251119",
+        name: "tool_search_tool_regex",
+      }
+    }
+
     switch (npm) {
       case "@ai-sdk/openai":
       case "@ai-sdk/azure":
         return {
-          ["openai" as string]: options,
+          ["openai" as string]: baseOptions,
         }
       case "@ai-sdk/amazon-bedrock":
         return {
-          ["bedrock" as string]: options,
+          ["bedrock" as string]: baseOptions,
         }
       case "@ai-sdk/anthropic":
         return {
-          ["anthropic" as string]: options,
+          ["anthropic" as string]: baseOptions,
         }
       case "@ai-sdk/google":
         return {
-          ["google" as string]: options,
+          ["google" as string]: baseOptions,
         }
       case "@ai-sdk/gateway":
         return {
-          ["gateway" as string]: options,
+          ["gateway" as string]: baseOptions,
         }
       case "@openrouter/ai-sdk-provider":
         return {
-          ["openrouter" as string]: options,
+          ["openrouter" as string]: baseOptions,
         }
       default:
         return {
-          [providerID]: options,
+          [providerID]: baseOptions,
         }
     }
   }

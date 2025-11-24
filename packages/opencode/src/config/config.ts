@@ -308,6 +308,12 @@ export namespace Config {
         .describe(
           "Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5 seconds) if not specified.",
         ),
+      defer_loading: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, tools from this MCP server are not loaded into context initially. They can be discovered on-demand via tool search (Anthropic advanced tool use feature).",
+        ),
     })
     .strict()
     .meta({
@@ -327,6 +333,12 @@ export namespace Config {
         .optional()
         .describe(
           "Timeout in ms for fetching tools from the MCP server. Defaults to 5000 (5 seconds) if not specified.",
+        ),
+      defer_loading: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, tools from this MCP server are not loaded into context initially. They can be discovered on-demand via tool search (Anthropic advanced tool use feature).",
         ),
     })
     .strict()

@@ -468,7 +468,7 @@ export namespace SessionPrompt {
         agent,
         system: lastUser.system,
       })
-      const tools = await resolveTools({
+      const { tools, hasDeferredTools } = await resolveTools({
         agent,
         sessionID,
         model: lastUser.model,
@@ -552,7 +552,9 @@ export namespace SessionPrompt {
             OUTPUT_TOKEN_MAX,
           ),
           abortSignal: abort,
-          providerOptions: ProviderTransform.providerOptions(model.npm, model.providerID, params.options),
+          providerOptions: ProviderTransform.providerOptions(model.npm, model.providerID, params.options, {
+            hasDeferredTools,
+          }),
           stopWhen: stepCountIs(1),
           temperature: params.temperature,
           topP: params.topP,
@@ -649,8 +651,9 @@ export namespace SessionPrompt {
     sessionID: string
     tools?: Record<string, boolean>
     processor: SessionProcessor.Info
-  }) {
+  }): Promise<{ tools: Record<string, AITool>; hasDeferredTools: boolean }> {
     const tools: Record<string, AITool> = {}
+    let hasDeferredTools = false
     const enabledTools = pipe(
       input.agent.tools,
       mergeDeep(await ToolRegistry.enabled(input.model.providerID, input.model.modelID, input.agent)),
@@ -663,7 +666,7 @@ export namespace SessionPrompt {
         input.model.modelID,
         z.toJSONSchema(item.parameters),
       )
-      tools[item.id] = tool({
+      const toolDef = tool({
         id: item.id as any,
         description: item.description,
         inputSchema: jsonSchema(schema as any),
@@ -722,12 +725,22 @@ export namespace SessionPrompt {
           }
         },
       })
+      // Add input_examples for Anthropic's tool use examples feature
+      if (item.inputExamples?.length) {
+        ;(toolDef as any).experimental_providerOptions = {
+          anthropic: {
+            input_examples: item.inputExamples,
+          },
+        }
+      }
+      tools[item.id] = toolDef
     }
 
     for (const [key, item] of Object.entries(await MCP.tools())) {
       if (Wildcard.all(key, enabledTools) === false) continue
       const execute = item.execute
       if (!execute) continue
+      const deferLoading = (item as any).deferLoading ?? false
       item.execute = async (args, opts) => {
         await Plugin.trigger(
           "tool.execute.before",
@@ -785,9 +798,18 @@ export namespace SessionPrompt {
           value: result.output,
         }
       }
+      // Add defer_loading support for Anthropic's advanced tool use feature
+      if (deferLoading) {
+        hasDeferredTools = true
+        ;(item as any).experimental_providerOptions = {
+          anthropic: {
+            defer_loading: true,
+          },
+        }
+      }
       tools[key] = item
     }
-    return tools
+    return { tools, hasDeferredTools }
   }
 
   async function createUserMessage(input: PromptInput) {

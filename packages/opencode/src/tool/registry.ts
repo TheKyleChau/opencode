@@ -110,10 +110,13 @@ export namespace ToolRegistry {
   export async function tools(_providerID: string, _modelID: string) {
     const tools = await all()
     const result = await Promise.all(
-      tools.map(async (t) => ({
-        id: t.id,
-        ...(await t.init()),
-      })),
+      tools.map(async (t) => {
+        const init = await t.init()
+        return {
+          id: t.id,
+          ...init,
+        }
+      }),
     )
     return result
   }

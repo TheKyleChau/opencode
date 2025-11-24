@@ -59,6 +59,7 @@ export namespace MCP {
       const config = cfg.mcp ?? {}
       const clients: Record<string, Client> = {}
       const status: Record<string, Status> = {}
+      const deferLoading: Record<string, boolean> = {}
 
       await Promise.all(
         Object.entries(config).map(async ([key, mcp]) => {
@@ -66,6 +67,7 @@ export namespace MCP {
           if (!result) return
 
           status[key] = result.status
+          deferLoading[key] = mcp.defer_loading ?? false
 
           if (result.mcpClient) {
             clients[key] = result.mcpClient
@@ -75,6 +77,7 @@ export namespace MCP {
       return {
         status,
         clients,
+        deferLoading,
       }
     },
     async (state) => {
@@ -111,6 +114,7 @@ export namespace MCP {
     }
     s.clients[name] = result.mcpClient
     s.status[name] = result.status
+    s.deferLoading[name] = mcp.defer_loading ?? false
 
     return {
       status: s.status,
@@ -262,7 +266,7 @@ export namespace MCP {
   }
 
   export async function tools() {
-    const result: Record<string, Tool> = {}
+    const result: Record<string, Tool & { deferLoading?: boolean }> = {}
     const s = await state()
     const clientsSnapshot = await clients()
     for (const [clientName, client] of Object.entries(clientsSnapshot)) {
@@ -278,10 +282,14 @@ export namespace MCP {
       if (!tools) {
         continue
       }
+      const shouldDefer = s.deferLoading[clientName] ?? false
       for (const [toolName, tool] of Object.entries(tools)) {
         const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
         const sanitizedToolName = toolName.replace(/[^a-zA-Z0-9_-]/g, "_")
-        result[sanitizedClientName + "_" + sanitizedToolName] = tool
+        result[sanitizedClientName + "_" + sanitizedToolName] = {
+          ...tool,
+          deferLoading: shouldDefer,
+        }
       }
     }
     return result
